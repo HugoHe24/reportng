@@ -21,13 +21,14 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ResourceBundle;
+
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.testng.IReporter;
@@ -39,6 +40,7 @@ import org.testng.IReporter;
 public abstract class AbstractReporter implements IReporter
 {
     private static final String ENCODING = "UTF-8";
+    private static boolean isVelcityInit = false;
 
     protected static final String TEMPLATE_EXTENSION = ".vm";
 
@@ -59,18 +61,23 @@ public abstract class AbstractReporter implements IReporter
     protected AbstractReporter(String classpathPrefix)
     {
         this.classpathPrefix = classpathPrefix;
-        Velocity.setProperty("resource.loader", "classpath");
-        Velocity.setProperty("classpath.resource.loader.class",
-                             "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
-        if (!META.shouldGenerateVelocityLog())
-        {
-            Velocity.setProperty("runtime.log.logsystem.class",
-                                 "org.apache.velocity.runtime.log.NullLogSystem");
-        }
 
         try
         {
-            Velocity.init();
+        	synchronized(this.getClass()) {
+	        	if(! isVelcityInit) {
+	        		Velocity.setProperty("resource.loader", "classpath");
+	        		Velocity.setProperty("classpath.resource.loader.class",
+	        				"org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
+	        		if (!META.shouldGenerateVelocityLog())
+	        		{
+	        			Velocity.setProperty("runtime.log.logsystem.class",
+	        					"org.apache.velocity.runtime.log.NullLogSystem");
+	        		}
+	        		Velocity.init();
+	        		isVelcityInit = true;
+	        	}
+        	}
         }
         catch (Exception ex)
         {
@@ -102,7 +109,8 @@ public abstract class AbstractReporter implements IReporter
                                 String templateName,
                                 VelocityContext context) throws Exception
     {
-        Writer writer = new BufferedWriter(new FileWriter(file));
+    	OutputStream out = new FileOutputStream(file);
+    	Writer writer = new BufferedWriter(new OutputStreamWriter(out, ENCODING));
         try
         {
             Velocity.mergeTemplate(classpathPrefix + templateName,
@@ -222,9 +230,8 @@ public abstract class AbstractReporter implements IReporter
 
     private static final class EmptyDirectoryFilter implements FileFilter
     {
-        public boolean accept(File file)
-        {
-            return file.isDirectory() && file.listFiles().length == 0;
-        }
-    }
+		public boolean accept(File file) {
+			return file.isDirectory() && file.listFiles().length == 0;
+		}
+	}
 }
